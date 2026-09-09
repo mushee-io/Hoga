@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import Link from 'next/link';
+import {Github} from 'lucide-react';
 import {getUser} from '@/lib/auth';
 import {logout} from './actions';
 import './globals.css';
@@ -28,7 +29,7 @@ export default async function RootLayout({children}:{children:React.ReactNode}){
         </nav>
         <div className="hoga-nav-actions">
           <a href="https://x.com" aria-label="HOGA on X" className="hoga-icon-link">𝕏</a>
-          <a href="https://github.com/mushee-io/Hoga" aria-label="HOGA on GitHub" className="hoga-icon-link">GH</a>
+          <a href="https://github.com/mushee-io/Hoga" aria-label="HOGA on GitHub" className="hoga-icon-link"><Github size={19} strokeWidth={2}/></a>
           {user?<>
             <Link href="/dashboard" className="hoga-launch">OPEN HOGA</Link>
             <form action={logout}><button className="text-button">Sign out</button></form>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import {ArrowRight,ArrowUpRight,Check,Code2,Globe2,MessageCircle,Radio,Search,Workflow} from 'lucide-react';
 import {db} from '@/lib/db';
 
@@ -28,10 +29,16 @@ export default async function Home(){
         </div>
       </div>
 
-      <div className="hoga-orbit-stage" aria-label="HOGA market intelligence motion graphic">
-        <div className="hoga-orbit hoga-orbit-a">{Array.from({length:36}).map((_,i)=><i key={`a-${i}`} style={{'--i':i} as React.CSSProperties}/>)}</div>
-        <div className="hoga-orbit hoga-orbit-b">{Array.from({length:24}).map((_,i)=><i key={`b-${i}`} style={{'--i':i} as React.CSSProperties}/>)}</div>
-        <div className="hoga-orbit-core"><span>HOGA</span><small>LIVE INTELLIGENCE</small></div>
+      <div className="hoga-orbit-stage" aria-label="HOGA logo">
+        <Image
+          src="/hoga-logo.png"
+          alt="HOGA"
+          width={640}
+          height={640}
+          priority
+          unoptimized
+          style={{width:'min(38vw,520px)',maxWidth:'82%',height:'auto',objectFit:'contain'}}
+        />
       </div>
     </section>
 
