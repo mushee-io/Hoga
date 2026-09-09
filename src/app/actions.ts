@@ -1,0 +1,37 @@
+'use server';
+import {z} from 'zod';
+import {hash,compare} from 'bcryptjs';
+import {headers} from 'next/headers';
+import {redirect} from 'next/navigation';
+import {revalidatePath} from 'next/cache';
+import {after} from 'next/server';
+import {db} from '@/lib/db';
+import {requireUser,createSession,destroySession,rateLimit} from '@/lib/auth';
+import {saveBusiness,saveService,createQuote,acceptQuote,requestPayment,confirmDemoPayment,serial} from '@/lib/commerce';
+import {fulfillOrder} from '@/lib/fulfillment';
+import {money} from '@/lib/validation';
+export type ActionResult={error?:string;success?:string};
+function errorResult(e:unknown):ActionResult { if(e instanceof z.ZodError)return {error:e.issues.map(i=>`${i.path.join('.')}: ${i.message}`).join('; ')}; if(e instanceof Error && !('code' in e))return {error:e.message};return {error:'Unable to save. Check for duplicate values and try again.'};}
+export async function authAction(_:ActionResult,form:FormData):Promise<ActionResult>{
+ let destination='/dashboard';
+ try{const ip=(await headers()).get('x-forwarded-for')?.split(',')[0]||'local';await rateLimit(`auth:${ip}`,12);
+ const email=z.email().max(254).parse(form.get('email')).toLowerCase(),password=z.string().min(12).max(72).parse(form.get('password'));
+ if(Buffer.byteLength(password)>72)throw new Error('Password must be at most 72 bytes');
+ const signup=form.get('mode')==='signup';let user=await db.user.findUnique({where:{email}});
+ if(signup){if(user)throw new Error('Unable to create account with those details');user=await db.user.create({data:{email,name:z.string().min(2).max(80).parse(form.get('name')),passwordHash:await hash(password,12)}});}else{if(!user || !await compare(password,user.passwordHash))throw new Error('Email or password is incorrect');}
+ await createSession(user.id);const next=String(form.get('next')||'');if(next.startsWith('/')&&!next.startsWith('//')&&!next.includes('\\'))destination=next;
+ }catch(e){return errorResult(e);}redirect(destination);
+}
+export async function logout(){await destroySession();redirect('/');}
+export async function businessAction(_:ActionResult,form:FormData):Promise<ActionResult>{
+ const user=await requireUser();let id='';try{await rateLimit(`business:${user.id}`);const result=await saveBusiness(user.id,{...Object.fromEntries(form),id:form.get('id')||undefined,published:form.get('published')==='on'});id=result.id;}catch(e){return errorResult(e);}revalidatePath('/');redirect(`/dashboard/businesses/${id}?saved=1`);
+}
+export async function serviceAction(_:ActionResult,form:FormData):Promise<ActionResult>{const user=await requireUser();try{await rateLimit(`service:${user.id}`);await saveService(user.id,{...Object.fromEntries(form),id:form.get('id')||undefined,negotiation:form.get('negotiation')==='on',startingPrice:form.get('startingPrice')==='on',active:form.get('active')==='on'});}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Service saved'};}
+export async function chatAction(_:ActionResult,form:FormData):Promise<ActionResult>{const user=await requireUser();let conversation='';try{await rateLimit(`chat:${user.id}`,15);const input=z.object({businessId:z.string(),serviceId:z.string(),message:z.string().min(3).max(6000),conversationId:z.string().optional(),offer:money.optional()}).parse({...Object.fromEntries(form),conversationId:form.get('conversationId')||undefined,offer:form.get('offer')||undefined});const result=await createQuote(user.id,input);conversation=result.conversationId;}catch(e){return errorResult(e);}revalidatePath('/');redirect(`/b/${String(form.get('slug'))}?conversation=${conversation}#conversation`);}
+export async function acceptAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();let id='';try{await rateLimit(`accept:${u.id}`);const order=await acceptQuote(u.id,z.string().parse(form.get('quoteId')));id=order.id;await requestPayment(u.id,id);}catch(e){if(!id)return errorResult(e);}revalidatePath('/');redirect(`/orders/${id}/payment`);}
+export async function rejectAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();try{await db.quote.updateMany({where:{id:String(form.get('quoteId')),status:'OPEN',conversation:{customerId:u.id}},data:{status:'REJECTED'}});}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Quote rejected'};}
+export async function paymentAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();try{await rateLimit(`payment:${u.id}`);await requestPayment(u.id,String(form.get('orderId')));}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Payment request created'};}
+export async function demoPayAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser(),id=String(form.get('orderId'));try{await rateLimit(`pay:${u.id}`);await confirmDemoPayment(u.id,id);after(()=>fulfillOrder(id));}catch(e){return errorResult(e);}revalidatePath('/');redirect(`/orders/${id}`);}
+export async function cancelAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();try{await serial(async tx=>{const o=await tx.order.findFirstOrThrow({where:{id:String(form.get('orderId')),OR:[{customerId:u.id},{business:{ownerId:u.id}}]}});if(!['QUOTE_ACCEPTED','PAYMENT_PENDING'].includes(o.state))throw new Error('Only unpaid orders can be cancelled');await tx.order.update({where:{id:o.id},data:{state:'CANCELLED',events:{create:{state:'CANCELLED',detail:'Unpaid order cancelled.'}}}});});}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Order cancelled'};}
+export async function reviewAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();try{const input=z.object({orderId:z.string(),rating:z.coerce.number().int().min(1).max(5),comment:z.string().min(3).max(1000)}).parse(Object.fromEntries(form));const o=await db.order.findFirstOrThrow({where:{id:input.orderId,customerId:u.id,state:'DELIVERED'},include:{payment:true}});if(o.payment?.mode!=='live')throw new Error('Demo orders cannot create public ratings');await db.review.create({data:{...input,businessId:o.businessId,customerId:u.id}});}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Review published'};}
+export async function settingsAction(_:ActionResult,form:FormData):Promise<ActionResult>{const u=await requireUser();try{await db.user.update({where:{id:u.id},data:{name:z.string().min(2).max(80).parse(form.get('name'))}});}catch(e){return errorResult(e);}revalidatePath('/');return {success:'Profile updated'};}

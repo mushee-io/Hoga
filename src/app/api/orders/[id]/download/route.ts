@@ -1,0 +1,3 @@
+import {getUser} from '@/lib/auth';
+import {db} from '@/lib/db';
+export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){const u=await getUser();if(!u)return new Response('Unauthorized',{status:401});const {id}=await params;const order=await db.order.findFirst({where:{id,state:'DELIVERED',OR:[{customerId:u.id},{business:{ownerId:u.id}}]},include:{fulfillment:{include:{deliverable:true}}}});const d=order?.fulfillment?.deliverable;if(!d)return new Response('Not found',{status:404});return new Response(d.content,{headers:{'Content-Type':'text/plain; charset=utf-8','Content-Disposition':`attachment; filename="hoga-${id}.txt"`,'Cache-Control':'private, no-store'}});}

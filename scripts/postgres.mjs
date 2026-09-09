@@ -1,0 +1,15 @@
+import EmbeddedPostgres from 'embedded-postgres';
+import {existsSync,mkdirSync} from 'node:fs';
+import path from 'node:path';
+const url=new URL(process.env.DATABASE_URL);
+if(!['127.0.0.1','localhost'].includes(url.hostname)) throw new Error('db:local requires a loopback DATABASE_URL');
+const dir=path.resolve('../../work/postgres');mkdirSync(path.dirname(dir),{recursive:true});
+const pg=new EmbeddedPostgres({databaseDir:dir,user:decodeURIComponent(url.username),password:decodeURIComponent(url.password),port:Number(url.port),persistent:true,authMethod:'scram-sha-256',postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:console.error});
+if(!existsSync(path.join(dir,'PG_VERSION')))await pg.initialise();
+await pg.start();
+const client=pg.getPgClient();await client.connect();const name=url.pathname.slice(1);
+if(!/^[a-z_]+$/.test(name))throw new Error('Invalid database name');
+const found=await client.query('select 1 from pg_database where datname=$1',[name]);if(!found.rowCount)await pg.createDatabase(name);await client.end();
+console.log(`Hoga PostgreSQL ready on 127.0.0.1:${url.port}`);
+process.on('SIGINT',async()=>{await pg.stop();process.exit(0);});
+setInterval(()=>{},60000);

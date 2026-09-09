@@ -1,0 +1,4 @@
+'use client';
+import {useEffect} from 'react';
+import {useRouter} from 'next/navigation';
+export function AutoRefresh(){const router=useRouter();useEffect(()=>{const timer=setInterval(()=>router.refresh(),3000);return ()=>clearInterval(timer);},[router]);return <p className="muted small" role="status">Status updates automatically.</p>;}

@@ -1,0 +1,4 @@
+import Link from 'next/link';
+import type {Order,Payment,Quote} from '@prisma/client';
+import {Badge,Empty,Money} from './ui';
+export function OrdersTable({orders}:{orders:(Order&{quote:Quote;payment:Payment|null})[]}){if(!orders.length)return <Empty title="No orders yet">Orders appear here when a customer accepts a quote.</Empty>;return <div className="table-wrap"><table><thead><tr><th>Order / business</th><th>Service</th><th>Status</th><th>Amount</th><th>Created</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><Link href={`/orders/${o.id}`}>#{o.id.slice(-8).toUpperCase()}</Link><br/><span className="muted small">{o.businessName}</span></td><td>{o.quote.serviceName}<br/>{o.payment?.mode==='demo'&&<Badge>Demo payment</Badge>}</td><td><Badge>{o.state.replaceAll('_',' ')}</Badge></td><td><Money amount={o.amount} currency={o.currency}/></td><td>{o.createdAt.toLocaleDateString('en-GB')}</td></tr>)}</tbody></table></div>;}

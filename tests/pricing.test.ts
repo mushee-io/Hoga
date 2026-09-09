@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {priceQuote} from '../src/lib/pricing';
+import {assertTransition,assertOwner} from '../src/lib/state';
+test('20% maximum discount on 12 enforces 9.60',()=>assert.equal(priceQuote('12','8',20,true,'9').amount,'9.600000'));
+test('absolute minimum wins over percentage discount',()=>assert.equal(priceQuote('12','11',20,true,'9').amount,'11.000000'));
+test('disabled negotiation preserves fixed price',()=>assert.equal(priceQuote('12','8',20,false,'9').amount,'12.000000'));
+test('fractional boundaries round upward without float errors',()=>assert.equal(priceQuote('0.000001','0',50,true,'0').amount,'0.000001'));
+test('invalid rules rejected',()=>{assert.throws(()=>priceQuote('12','13',20,true));assert.throws(()=>priceQuote('12','0',101,true));});
+test('no direct fulfillment before paid',()=>assert.throws(()=>assertTransition('PAYMENT_PENDING','FULFILLING')));
+test('successful fulfillment transitions',()=>{assertTransition('PAID','FULFILLING');assertTransition('FULFILLING','QUALITY_CHECK');assertTransition('QUALITY_CHECK','DELIVERED');});
+test('ownership checks reject another creator',()=>{assertOwner('owner','owner');assert.throws(()=>assertOwner('owner','intruder'));});

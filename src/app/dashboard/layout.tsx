@@ -1,0 +1,4 @@
+import Link from 'next/link';
+import {LayoutGrid,Briefcase,Package,BarChart3,Plug,Settings,Users,Receipt,Layers} from 'lucide-react';
+import {requireUser} from '@/lib/auth';
+export default async function DashboardLayout({children}:{children:React.ReactNode}){const u=await requireUser();const links=[['','Overview',LayoutGrid],['businesses','Businesses',Briefcase],['services','Services',Layers],['orders','Orders',Package],['customers','Customers',Users],['transactions','Transactions',Receipt],['analytics','Analytics',BarChart3],['integrations','Integrations',Plug],['settings','Settings',Settings]] as const;return <div className="workspace"><aside className="sidebar"><p className="eyebrow">{u.name} / WORKSPACE</p>{links.map(([path,title,Icon])=><Link key={path} href={`/dashboard${path?'/'+path:''}`}><Icon size={16}/>{title}</Link>)}</aside><main className="workspace-main">{children}</main></div>;}

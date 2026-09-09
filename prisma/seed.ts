@@ -1,0 +1,15 @@
+import {randomBytes} from 'node:crypto';
+import {hash} from 'bcryptjs';
+import Decimal from 'decimal.js';
+import {db} from '../src/lib/db';
+const samples=[
+ {name:'MarketIQ',slug:'marketiq',logo:'M',category:'Research',description:'Competitive intelligence for your next big decision.',services:[['Competitor Report','A structured review of competitors using your supplied source material.','10'],['Market Research','Market landscape, key signals, opportunities, and evidence gaps.','25'],['Custom Research','A tailored research framework addressing a specific business question.','15']]},
+ {name:'BrandForge',slug:'brandforge',logo:'Bf',category:'Design',description:'A sharper identity. A clearer story. A brand that connects.',services:[['Brand Strategy','Positioning, audience definition, voice, and strategic recommendations.','20'],['Messaging Guide','A consistent messaging system with sample copy and voice guidelines.','15']]},
+ {name:'ChainLens',slug:'chainlens',logo:'Cl',category:'Blockchain',description:'Clarity on protocols, ecosystems, and the onchain economy.',services:[['Protocol Analysis','A structured protocol review from supplied technical documentation.','18']]},
+ {name:'GrowthDesk',slug:'growthdesk',logo:'Gd',category:'Marketing',description:'Practical growth strategies for ambitious businesses.',services:[['Growth Plan','An actionable marketing plan with hypotheses and measurement guidance.','25']]},
+ {name:'CodeReview AI',slug:'codereview-ai',logo:'</>',category:'Development',description:'A second set of eyes for better, more dependable code.',services:[['Code Review','Review supplied code for correctness, clarity, and potential risks.','12']]}
+];
+const owner=await db.user.upsert({where:{email:'samples@hoga.invalid'},update:{},create:{email:'samples@hoga.invalid',name:'Hoga Samples',passwordHash:await hash(randomBytes(32).toString('hex'),12)}});
+for(const s of samples){const existing=await db.business.findUnique({where:{slug:s.slug}});if(existing)continue;await db.business.create({data:{ownerId:owner.id,name:s.name,slug:s.slug,logo:s.logo,category:s.category,shortDescription:s.description,description:`${s.description} We turn focused requests and supplied context into structured, useful deliverables. This is a Sample Business for exploring the Hoga commerce workflow.`,agentName:s.name,personality:'Direct, thoughtful, and detail-oriented',instructions:`Provide ${s.category.toLowerCase()} services with clear scopes and explicit limitations. Never invent facts or sources.`,fulfillmentInstructions:'Deliver an executive summary, structured analysis, practical next steps, and explicit evidence gaps. Use only supplied source material.',currency:'USDC',published:true,sample:true,services:{create:s.services.map(([name,description,price])=>({name,description,price,minimum:new Decimal(price).mul('0.8').toString(),maxDiscount:20,negotiation:true,startingPrice:name==='Custom Research'}))}}});}
+console.log('Seeded five clearly labelled sample businesses. No orders, payments, or reviews were fabricated.');await db.$disconnect();
+
