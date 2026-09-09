@@ -1,0 +1,4 @@
+import {notFound} from 'next/navigation';
+import {db} from '@/lib/db';
+import {BusinessCard} from '@/components/ui';
+export default async function Widget({params,searchParams}:{params:Promise<{slug:string}>;searchParams:Promise<{origin?:string}>}){const {slug}=await params,p=await searchParams;const b=await db.business.findFirst({where:{slug,published:true},include:{services:{where:{active:true},orderBy:{price:'asc'}},widget:true}});if(!b)notFound();if(p.origin&&b.widget?.allowedDomains.length&&!b.widget.allowedDomains.includes(new URL(p.origin).hostname))return <main className="content"><p>Widget unavailable for this domain.</p></main>;return <main className="content" style={{padding:'16px'}}><BusinessCard business={b}/><a className="button spaced" href={`/b/${b.slug}`} target="_blank">{b.widget?.launcherLabel||'Ask us'} ↗</a></main>}

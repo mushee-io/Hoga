@@ -40,6 +40,7 @@ model User {
   conversations Conversation[]
   orders Order[]
   reviews Review[]
+  telegram TelegramIdentity?
 }
 model Session {
   id String @id
@@ -71,6 +72,10 @@ model Business {
   conversations Conversation[]
   orders Order[]
   reviews Review[]
+  apiKeys ApiKey[]
+  webhooks WebhookEndpoint[]
+  widget WidgetConfig?
+  reportsReceived Report[] @relation("reportedBusiness")
   @@index([ownerId])
   @@index([published, category])
 }
@@ -96,6 +101,7 @@ model Conversation {
   customerId String
   customer User @relation(fields:[customerId], references:[id])
   createdAt DateTime @default(now())
+  channel String @default("web")
   messages Message[]
   quotes Quote[]
   @@index([customerId, businessId])
@@ -152,6 +158,9 @@ model Order {
   fulfillment Fulfillment?
   events OrderEvent[]
   review Review?
+  revisions Revision[]
+  reports Report[]
+  source String @default("web")
   @@index([customerId])
   @@index([businessId, createdAt])
 }
@@ -212,7 +221,95 @@ model Review {
   customer User @relation(fields:[customerId],references:[id])
   rating Int
   comment String
+  privateFeedback String?
+  moderationState String @default("published")
   createdAt DateTime @default(now())
+}
+model ApiKey {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields:[businessId], references:[id])
+  name String
+  prefix String @unique
+  secretHash String
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime?
+  revokedAt DateTime?
+  @@index([businessId, revokedAt])
+}
+model WebhookEndpoint {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields:[businessId], references:[id])
+  url String
+  secretHash String
+  secretLast4 String
+  events String[]
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  deliveries WebhookDelivery[]
+  @@index([businessId, active])
+}
+model WebhookDelivery {
+  id String @id @default(cuid())
+  endpointId String
+  endpoint WebhookEndpoint @relation(fields:[endpointId],references:[id],onDelete:Restrict)
+  event String
+  payload Json
+  attempt Int @default(0)
+  status String @default("pending")
+  responseCode Int?
+  error String?
+  nextAttemptAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  deliveredAt DateTime?
+  @@index([status,nextAttemptAt])
+}
+model WidgetConfig {
+  id String @id @default(cuid())
+  businessId String @unique
+  business Business @relation(fields:[businessId],references:[id])
+  welcomeMessage String @default("What would you like to get done?")
+  layout String @default("compact")
+  appearance String @default("light")
+  showServices Boolean @default(true)
+  showPrices Boolean @default(true)
+  allowNegotiation Boolean @default(true)
+  launcherLabel String @default("Ask us")
+  allowedDomains String[] @default([])
+  updatedAt DateTime @updatedAt
+}
+model TelegramIdentity {
+  id String @id @default(cuid())
+  userId String @unique
+  user User @relation(fields:[userId],references:[id])
+  telegramId String @unique
+  username String?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+}
+model Revision {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields:[orderId],references:[id])
+  request String
+  status String @default("requested")
+  deliverableVersion Int @default(0)
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+}
+model Report {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation("reportedBusiness",fields:[businessId],references:[id])
+  orderId String?
+  order Order? @relation(fields:[orderId],references:[id])
+  reporterId String
+  reason String
+  detail String?
+  state String @default("open")
+  createdAt DateTime @default(now())
+  @@index([businessId,state])
 }
 model RateLimit {
   key String @id

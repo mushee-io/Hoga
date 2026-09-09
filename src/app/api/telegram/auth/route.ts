@@ -1,0 +1,4 @@
+import {randomBytes} from 'node:crypto';
+import {db} from '@/lib/db';
+import {verifyTelegramInitData} from '@/lib/telegram';
+export async function POST(request:Request){try{const {initData}=await request.json();const t=verifyTelegramInitData(String(initData));let identity=await db.telegramIdentity.findUnique({where:{telegramId:t.id},include:{user:true}});if(!identity){const user=await db.user.create({data:{email:`telegram-${t.id}@telegram.hoga.invalid`,name:t.name,passwordHash:randomBytes(32).toString('hex'),telegram:{create:{telegramId:t.id,username:t.username}}}});identity=await db.telegramIdentity.findUniqueOrThrow({where:{userId:user.id},include:{user:true}});}else await db.telegramIdentity.update({where:{id:identity.id},data:{lastSeenAt:new Date(),username:t.username}});return Response.json({user:{id:identity.user.id,name:identity.user.name}});}catch(e){return Response.json({error:e instanceof Error?e.message:'Telegram authentication failed'},{status:401});}}
