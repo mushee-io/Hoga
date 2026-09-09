@@ -16,4 +16,4 @@ Creator actions require a session and ownership checks. Pricing and payment tran
 
 ## Test & ship
 
-Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`. Deploy with a managed PostgreSQL database and persistent job worker or authenticated cron endpoint. See [MOOVE_INTEGRATION.md](MOOVE_INTEGRATION.md) for settlement status.
+Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`. Confirmed payments start fulfillment in the payment request path; the Vercel daily cron only recovers interrupted or failed jobs. Deploy with a managed PostgreSQL database and a persistent worker when timely retry recovery is required. See [MOOVE_INTEGRATION.md](MOOVE_INTEGRATION.md) for settlement status.
